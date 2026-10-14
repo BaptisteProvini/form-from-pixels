@@ -1,6 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { Tables } from "@/integrations/supabase/types";
-import { sha256Hex } from "./files";
+import { imageDHash, sha256Hex } from "./files";
+import { findDuplicates, duplicateReasons, type DupCandidate } from "./duplicates";
 
 export type Company = Tables<"companies">;
 export type Category = Tables<"categories">;
@@ -76,6 +77,7 @@ export function computeMissing(e: Partial<Expense>, receiptCount: number): strin
 export async function uploadReceipts(params: { userId: string; companyId: string; expenseId: string; files: File[] }) {
   for (const file of params.files) {
     const sha = await sha256Hex(file);
+    const phash = await imageDHash(file);
     const safe = file.name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(-80) || "justificatif";
     const path = `${params.userId}/${params.companyId}/${params.expenseId}/${crypto.randomUUID()}-${safe}`;
     const { error: upErr } = await supabase.storage.from("receipts").upload(path, file, {
@@ -91,55 +93,43 @@ export async function uploadReceipts(params: { userId: string; companyId: string
       mime: file.type || "application/octet-stream",
       size_bytes: file.size,
       sha256: sha,
+      phash,
     });
     if (error) throw error;
   }
 }
 
-/** Returns refs of expenses in this company already holding an identical file. */
-export async function findDuplicateFiles(companyId: string, files: File[], excludeExpenseId?: string) {
-  const hashes = await Promise.all(files.map(sha256Hex));
-  if (!hashes.length) return [];
-  const { data } = await supabase
-    .from("receipts")
-    .select("expense_id, sha256, expenses(ref)")
-    .eq("company_id", companyId)
-    .in("sha256", hashes);
-  return (data ?? [])
-    .filter((r) => r.expense_id !== excludeExpenseId)
-    .map((r) => (r as unknown as { expenses: { ref: string } | null }).expenses?.ref ?? "?");
+export function toCandidate(e: ExpenseFull): DupCandidate {
+  return {
+    id: e.id, ref: e.ref, expense_date: e.expense_date, supplier: e.supplier,
+    total_ttc: e.total_ttc != null ? Number(e.total_ttc) : null, currency: e.currency,
+    hashes: e.receipts.map((r) => r.sha256),
+    phashes: e.receipts.map((r) => r.phash).filter((p): p is string => !!p),
+  };
 }
 
-export async function findSimilarExpenses(
+/** Checks a new/edited expense against existing ones of the same company. */
+export async function checkDuplicates(
   companyId: string,
-  e: { expense_date: string | null; total_ttc: number | null },
+  e: { expense_date: string | null; supplier: string | null; total_ttc: number | null; currency: string },
+  files: File[],
   excludeId?: string,
-) {
-  if (!e.expense_date || e.total_ttc == null) return [];
-  const { data } = await supabase
-    .from("expenses")
-    .select("id, ref, supplier")
-    .eq("company_id", companyId)
-    .eq("expense_date", e.expense_date)
-    .eq("total_ttc", e.total_ttc);
-  return (data ?? []).filter((d) => d.id !== excludeId);
+): Promise<{ ref: string; reasons: string[] }[]> {
+  const hashes = await Promise.all(files.map(sha256Hex));
+  const phashes = (await Promise.all(files.map(imageDHash))).filter((p): p is string => !!p);
+  const existing = await fetchExpenses(companyId);
+  const me: DupCandidate = { id: excludeId ?? "__new__", ...e, hashes, phashes };
+  return existing
+    .filter((x) => x.id !== excludeId)
+    .map((x) => ({ ref: x.ref ?? "?", reasons: duplicateReasons(me, toCandidate(x)) }))
+    .filter((r) => r.reasons.length > 0);
 }
 
-/** Duplicate detection within a list (same date + amount, or same file hash). */
+export function duplicateMap(list: ExpenseFull[]) {
+  return findDuplicates(list.map(toCandidate));
+}
+
+/** Ids of expenses that look like duplicates of another one in the list. */
 export function duplicateIds(list: ExpenseFull[]): Set<string> {
-  const ids = new Set<string>();
-  const byKey = new Map<string, string>();
-  const byHash = new Map<string, string>();
-  for (const e of list) {
-    if (e.expense_date && e.total_ttc != null) {
-      const k = `${e.expense_date}|${Number(e.total_ttc).toFixed(2)}|${e.currency}`;
-      const prev = byKey.get(k);
-      if (prev) { ids.add(prev); ids.add(e.id); } else byKey.set(k, e.id);
-    }
-    for (const r of e.receipts) {
-      const prev = byHash.get(r.sha256);
-      if (prev && prev !== e.id) { ids.add(prev); ids.add(e.id); } else byHash.set(r.sha256, e.id);
-    }
-  }
-  return ids;
+  return new Set(duplicateMap(list).keys());
 }

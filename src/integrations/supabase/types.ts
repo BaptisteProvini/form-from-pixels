@@ -283,6 +283,7 @@ export type Database = {
           id: string
           mime: string
           path: string
+          phash: string | null
           sha256: string
           size_bytes: number
           user_id: string
@@ -295,6 +296,7 @@ export type Database = {
           id?: string
           mime: string
           path: string
+          phash?: string | null
           sha256: string
           size_bytes: number
           user_id?: string
@@ -307,6 +309,7 @@ export type Database = {
           id?: string
           mime?: string
           path?: string
+          phash?: string | null
           sha256?: string
           size_bytes?: number
           user_id?: string

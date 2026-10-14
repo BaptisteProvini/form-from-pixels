@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Download, Paperclip, Trash2, History, Lock } from "lucide-react";
@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { ExpenseForm, emptyForm, formToRow, num, type FormState } from "@/components/expense-form";
-import { computeMissing, fetchCategories, fetchExpense, uploadReceipts, FIELD_LABELS, type ExpenseFull } from "@/lib/data";
+import { computeMissing, duplicateMap, fetchCategories, fetchExpense, fetchExpenses, uploadReceipts, FIELD_LABELS, type ExpenseFull } from "@/lib/data";
 import { formatDate } from "@/lib/format";
 
 export const Route = createFileRoute("/_authenticated/depenses/$id")({
@@ -43,6 +43,8 @@ function DetailPage() {
     queryKey: ["history", id],
     queryFn: async () => (await supabase.from("expense_history").select("*").eq("expense_id", id).order("created_at", { ascending: false })).data ?? [],
   });
+  const { data: siblings = [] } = useQuery({ queryKey: ["expenses", e?.company_id], queryFn: () => fetchExpenses(e!.company_id), enabled: !!e });
+  const dupList = duplicateMap(siblings).get(id) ?? [];
   const [form, setForm] = useState<FormState | null>(null);
   const [saving, setSaving] = useState(false);
   const extraRef = useRef<HTMLInputElement>(null);
@@ -117,6 +119,16 @@ function DetailPage() {
       </div>
       {e.modified_after_export && (
         <div className="rounded-xl border border-warning bg-warning/10 p-3 text-sm text-warning-foreground">Modifiée après l'export comptable : informez votre comptable.</div>
+      )}
+      {dupList.length > 0 && (
+        <div className="space-y-1 rounded-xl border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">
+          <div className="font-semibold">Doublon possible</div>
+          {dupList.map((d) => (
+            <Link key={d.id} to="/depenses/$id" params={{ id: d.id }} className="block underline-offset-2 hover:underline">
+              {d.ref} — {d.reasons.join(", ")}
+            </Link>
+          ))}
+        </div>
       )}
       {e.missing_fields.length > 0 && (
         <div className="rounded-xl border border-warning bg-warning/10 p-3 text-sm text-warning-foreground">
