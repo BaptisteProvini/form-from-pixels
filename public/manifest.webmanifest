@@ -1,0 +1,13 @@
+{
+  "name": "Mes Frais Pro",
+  "short_name": "Mes Frais",
+  "start_url": "/accueil",
+  "display": "standalone",
+  "background_color": "#f7f9fb",
+  "theme_color": "#1b2a4a",
+  "lang": "fr",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
