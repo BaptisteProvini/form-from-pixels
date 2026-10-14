@@ -26,7 +26,7 @@ export const FIELD_LABELS: Record<string, string> = {
 };
 
 export async function fetchCompanies(): Promise<Company[]> {
-  const { data, error } = await supabase.from("companies").select("*").order("created_at");
+  const { data, error } = await supabase.from("companies").select("*").order("created_at").order("name").order("id");
   if (error) throw error;
   return data;
 }
