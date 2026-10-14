@@ -1,5 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
-import { duplicateIds, fetchExpenses, FIELD_LABELS, type Company } from "./data";
+import { duplicateMap, fetchExpenses, FIELD_LABELS, type Company } from "./data";
 import { MONTHS_FR, PAYMENT_METHODS, STATUS_LABELS, formatDate, slugify } from "./format";
 import { downloadBlob, extOf } from "./files";
 
@@ -24,7 +24,7 @@ export async function generateExport(company: Company, period: Period, onProgres
   const list = (await fetchExpenses(company.id, period)).sort((a, b) => (a.seq ?? 0) - (b.seq ?? 0));
   // also include expenses without date (flagged in report)
   const { data: undated } = await supabase.from("expenses").select("ref").eq("company_id", company.id).is("expense_date", null);
-  const dups = duplicateIds(list);
+  const dups = duplicateMap(list);
 
   const zip = new JSZip();
   const folder = zip.folder("Justificatifs")!;
@@ -100,7 +100,7 @@ export async function generateExport(company: Company, period: Period, onProgres
     const m = e.missing_fields.filter((f) => f !== "receipt");
     if (m.length) issues.push([e.ref!, "Informations incomplètes", m.map((f) => FIELD_LABELS[f] ?? f).join(", ")]);
     if (e.receipts.length === 0) issues.push([e.ref!, "Justificatif manquant", ""]);
-    if (dups.has(e.id)) issues.push([e.ref!, "Doublon suspect", "Même date et montant ou même fichier qu'une autre dépense"]);
+    for (const d of dups.get(e.id) ?? []) issues.push([e.ref!, "Doublon suspect", `Avec ${d.ref} : ${d.reasons.join(", ")}`]);
     if (e.status !== "valide") issues.push([e.ref!, "Non validée", ""]);
     if (e.currency !== "CHF" && e.chf_amount == null) issues.push([e.ref!, "Contre-valeur CHF manquante", e.currency]);
     if (e.modified_after_export) issues.push([e.ref!, "Modifiée après un export précédent", ""]);
