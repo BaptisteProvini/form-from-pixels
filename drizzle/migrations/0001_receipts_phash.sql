@@ -1,0 +1,1 @@
+ALTER TABLE public.receipts ADD COLUMN phash text;
