@@ -25,6 +25,14 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
     [companies, id],
   );
 
+  // Persist the effective selection so every page uses the same company.
+  useEffect(() => {
+    if (company && company.id !== id) {
+      localStorage.setItem(KEY, company.id);
+      setId(company.id);
+    }
+  }, [company, id]);
+
   const value: Ctx = {
     companies,
     company,
