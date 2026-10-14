@@ -10,7 +10,7 @@ import { useCompany } from "@/components/company-context";
 import { ExpenseForm, emptyForm, formToRow, num, selectCls, type FormState } from "@/components/expense-form";
 import { analyzeReceipt } from "@/lib/analyze.functions";
 import { prepareForAnalysis } from "@/lib/files";
-import { computeMissing, fetchCategories, findDuplicateFiles, findSimilarExpenses, uploadReceipts } from "@/lib/data";
+import { checkDuplicates, computeMissing, fetchCategories, uploadReceipts } from "@/lib/data";
 
 export const Route = createFileRoute("/_authenticated/scanner")({
   head: () => ({ meta: [{ title: "Scanner une dépense — Mes Frais Pro" }, { name: "description", content: "Photographiez un ticket." }, { property: "og:title", content: "Scanner — Mes Frais Pro" }, { property: "og:description", content: "Photographiez un ticket." }] }),
@@ -98,11 +98,10 @@ function ScannerPage() {
     setSaving(true);
     try {
       const row = formToRow(form);
-      const dupFiles = await findDuplicateFiles(companyId, files);
-      const similar = await findSimilarExpenses(companyId, row);
-      if (dupFiles.length || similar.length) {
-        const refs = [...new Set([...dupFiles, ...similar.map((s) => s.ref)])].join(", ");
-        if (!window.confirm(`Doublon possible avec ${refs}. Enregistrer quand même ?`)) { setSaving(false); return; }
+      const dups = await checkDuplicates(companyId, row, files);
+      if (dups.length) {
+        const msg = dups.slice(0, 5).map((d) => `• ${d.ref} : ${d.reasons.join(", ")}`).join("\n");
+        if (!window.confirm(`Doublon possible :\n${msg}\n\nEnregistrer quand même ?`)) { setSaving(false); return; }
       }
       const missing = computeMissing(row, files.length);
       const { data: u } = await supabase.auth.getUser();
