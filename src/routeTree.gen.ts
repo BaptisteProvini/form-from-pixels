@@ -14,6 +14,8 @@ import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as AuthenticatedAccueilRouteImport } from './routes/_authenticated/accueil'
+import { Route as AuthenticatedExportRouteImport } from './routes/_authenticated/export'
+import { Route as AuthenticatedReglagesRouteImport } from './routes/_authenticated/reglages'
 import { Route as AuthenticatedScannerRouteImport } from './routes/_authenticated/scanner'
 import { Route as AuthenticatedDepensesIndexRouteImport } from './routes/_authenticated/depenses.index'
 import { Route as AuthenticatedDepensesIdRouteImport } from './routes/_authenticated/depenses.$id'
@@ -42,6 +44,16 @@ const AuthenticatedAccueilRoute = AuthenticatedAccueilRouteImport.update({
   path: '/accueil',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedExportRoute = AuthenticatedExportRouteImport.update({
+  id: '/export',
+  path: '/export',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedReglagesRoute = AuthenticatedReglagesRouteImport.update({
+  id: '/reglages',
+  path: '/reglages',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedScannerRoute = AuthenticatedScannerRouteImport.update({
   id: '/scanner',
   path: '/scanner',
@@ -64,6 +76,8 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/reset-password': typeof ResetPasswordRoute
   '/accueil': typeof AuthenticatedAccueilRoute
+  '/export': typeof AuthenticatedExportRoute
+  '/reglages': typeof AuthenticatedReglagesRoute
   '/scanner': typeof AuthenticatedScannerRoute
   '/depenses/$id': typeof AuthenticatedDepensesIdRoute
   '/depenses/': typeof AuthenticatedDepensesIndexRoute
@@ -73,6 +87,8 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/reset-password': typeof ResetPasswordRoute
   '/accueil': typeof AuthenticatedAccueilRoute
+  '/export': typeof AuthenticatedExportRoute
+  '/reglages': typeof AuthenticatedReglagesRoute
   '/scanner': typeof AuthenticatedScannerRoute
   '/depenses/$id': typeof AuthenticatedDepensesIdRoute
   '/depenses': typeof AuthenticatedDepensesIndexRoute
@@ -84,6 +100,8 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/reset-password': typeof ResetPasswordRoute
   '/_authenticated/accueil': typeof AuthenticatedAccueilRoute
+  '/_authenticated/export': typeof AuthenticatedExportRoute
+  '/_authenticated/reglages': typeof AuthenticatedReglagesRoute
   '/_authenticated/scanner': typeof AuthenticatedScannerRoute
   '/_authenticated/depenses/$id': typeof AuthenticatedDepensesIdRoute
   '/_authenticated/depenses/': typeof AuthenticatedDepensesIndexRoute
@@ -95,6 +113,8 @@ export interface FileRouteTypes {
     | '/auth'
     | '/reset-password'
     | '/accueil'
+    | '/export'
+    | '/reglages'
     | '/scanner'
     | '/depenses/$id'
     | '/depenses/'
@@ -104,6 +124,8 @@ export interface FileRouteTypes {
     | '/auth'
     | '/reset-password'
     | '/accueil'
+    | '/export'
+    | '/reglages'
     | '/scanner'
     | '/depenses/$id'
     | '/depenses'
@@ -114,6 +136,8 @@ export interface FileRouteTypes {
     | '/auth'
     | '/reset-password'
     | '/_authenticated/accueil'
+    | '/_authenticated/export'
+    | '/_authenticated/reglages'
     | '/_authenticated/scanner'
     | '/_authenticated/depenses/$id'
     | '/_authenticated/depenses/'
@@ -163,6 +187,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAccueilRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/export': {
+      id: '/_authenticated/export'
+      path: '/export'
+      fullPath: '/export'
+      preLoaderRoute: typeof AuthenticatedExportRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/reglages': {
+      id: '/_authenticated/reglages'
+      path: '/reglages'
+      fullPath: '/reglages'
+      preLoaderRoute: typeof AuthenticatedReglagesRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/scanner': {
       id: '/_authenticated/scanner'
       path: '/scanner'
@@ -189,6 +227,8 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAccueilRoute: typeof AuthenticatedAccueilRoute
+  AuthenticatedExportRoute: typeof AuthenticatedExportRoute
+  AuthenticatedReglagesRoute: typeof AuthenticatedReglagesRoute
   AuthenticatedScannerRoute: typeof AuthenticatedScannerRoute
   AuthenticatedDepensesIdRoute: typeof AuthenticatedDepensesIdRoute
   AuthenticatedDepensesIndexRoute: typeof AuthenticatedDepensesIndexRoute
@@ -196,6 +236,8 @@ interface AuthenticatedRouteRouteChildren {
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAccueilRoute: AuthenticatedAccueilRoute,
+  AuthenticatedExportRoute: AuthenticatedExportRoute,
+  AuthenticatedReglagesRoute: AuthenticatedReglagesRoute,
   AuthenticatedScannerRoute: AuthenticatedScannerRoute,
   AuthenticatedDepensesIdRoute: AuthenticatedDepensesIdRoute,
   AuthenticatedDepensesIndexRoute: AuthenticatedDepensesIndexRoute,
