@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { FileArchive, Mail } from "lucide-react";
+import { FileText, Mail } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -123,7 +123,7 @@ function ExportPage() {
           </div>
         )}
         <Button variant="accent" size="xl" className="w-full" disabled={!!busy} onClick={run}>
-          <FileArchive className="!size-5" /> {busy ?? "Générer le rapport PDF"}
+          <FileText className="!size-5" /> {busy ?? "Générer le rapport PDF"}
         </Button>
         {shareable && (
           <Button variant="outline" size="xl" className="w-full" disabled={!!busy} onClick={shareReport}>
