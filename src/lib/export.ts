@@ -151,7 +151,7 @@ export async function generateExportBlob(company: Company, period: Period, onPro
         page.drawImage(img, { x: (W - img.width * s) / 2, y: H - M - 20 - img.height * s, width: img.width * s, height: img.height * s });
       } catch { y -= 16; text("Image non lisible : disponible dans l'application.", M, 9, font, grey); }
     }
-    return new Blob([await doc.save()], { type: "application/pdf" });
+    return new Blob([(await doc.save()) as Uint8Array<ArrayBuffer>], { type: "application/pdf" });
   };
 
   let blob = await build(1600, 0.7);

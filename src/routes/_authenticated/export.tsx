@@ -75,7 +75,7 @@ function ExportPage() {
     }
   }
 
-  async function shareZip() {
+  async function shareReport() {
     if (!shareable) return;
     const file = new File([shareable.blob], shareable.name, { type: "application/pdf" });
     if (!filesShareSupported(file)) {
@@ -126,7 +126,7 @@ function ExportPage() {
           <FileArchive className="!size-5" /> {busy ?? "Générer le rapport PDF"}
         </Button>
         {shareable && (
-          <Button variant="outline" size="xl" className="w-full" disabled={!!busy} onClick={shareZip}>
+          <Button variant="outline" size="xl" className="w-full" disabled={!!busy} onClick={shareReport}>
             <Mail className="!size-5" /> Envoyer par e-mail
           </Button>
         )}
