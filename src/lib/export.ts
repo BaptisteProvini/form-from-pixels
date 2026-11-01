@@ -134,7 +134,6 @@ export async function generateExportBlob(company: Company, period: Period, onPro
   onProgress?.("Compression…");
   const blob = await zip.generateAsync({ type: "blob", compression: "DEFLATE" });
   const zipName = `${slugify(company.name.replace(/\b(Sàrl|SA|Sarl|GmbH|AG)\b/gi, ""))}_${period.fileTag}.zip`;
-  downloadBlob(blob, zipName);
 
   // record export, lock expenses
   const ids = list.filter((e) => !e.exported_at).map((e) => e.id);
@@ -150,5 +149,12 @@ export async function generateExportBlob(company: Company, period: Period, onPro
     filename: zipName,
     expense_count: list.length,
   });
-  return { zipName, count: list.length, issues: issues.length };
+  return { blob, zipName, count: list.length, issues: issues.length };
+}
+
+/** Builds the ZIP and saves it to the device's downloads. */
+export async function generateExport(company: Company, period: Period, onProgress?: (msg: string) => void) {
+  const r = await generateExportBlob(company, period, onProgress);
+  downloadBlob(r.blob, r.zipName);
+  return { zipName: r.zipName, count: r.count, issues: r.issues };
 }
