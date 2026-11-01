@@ -1,14 +1,15 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { FileArchive } from "lucide-react";
+import { FileArchive, Mail } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useCompany } from "@/components/company-context";
 import { selectCls } from "@/components/expense-form";
-import { buildPeriod, generateExport } from "@/lib/export";
+import { buildPeriod, generateExportBlob } from "@/lib/export";
+import { downloadBlob } from "@/lib/files";
 import { MONTHS_FR, PERIOD_STATUS, formatDate } from "@/lib/format";
 
 export const Route = createFileRoute("/_authenticated/export")({
