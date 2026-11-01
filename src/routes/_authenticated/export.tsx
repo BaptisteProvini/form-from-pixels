@@ -79,8 +79,14 @@ function ExportPage() {
     if (!shareable) return;
     const file = new File([shareable.blob], shareable.name, { type: "application/pdf" });
     if (!filesShareSupported(file)) {
+      let embedded = false;
+      try { embedded = window.self !== window.top; } catch { embedded = true; }
+      if (embedded) {
+        toast.info("L'envoi par e-mail est bloqué dans l'aperçu Lovable. Ouvrez l'application dans Safari (lien publié ou lien d'aperçu) pour l'utiliser.", { duration: 10000 });
+        return;
+      }
       downloadBlob(shareable.blob, shareable.name);
-      toast.info("Partage direct indisponible ici : le fichier a été retéléchargé, joignez-le depuis votre application e-mail.");
+      toast.info("Partage direct indisponible sur cet appareil : le fichier a été téléchargé, joignez-le depuis votre application e-mail.");
       return;
     }
     try {
