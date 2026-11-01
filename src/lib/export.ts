@@ -18,7 +18,10 @@ export function buildPeriod(kind: "mois" | "trimestre" | "annee" | "perso", year
   return { start: c.start, end: c.end, label: `${formatDate(c.start)} – ${formatDate(c.end)}`, fileTag: `${c.start}_${c.end}`, sheetTag: `${c.start}_${c.end}` };
 }
 
-export async function generateExport(company: Company, period: Period, onProgress?: (msg: string) => void) {
+export type ExportResult = { blob: Blob; zipName: string; count: number; issues: number };
+
+/** Builds the ZIP without downloading it (used for download and for native share). */
+export async function generateExportBlob(company: Company, period: Period, onProgress?: (msg: string) => void): Promise<ExportResult> {
   const [{ default: ExcelJS }, { default: JSZip }] = await Promise.all([import("exceljs"), import("jszip")]);
   onProgress?.("Lecture des dépenses…");
   const list = (await fetchExpenses(company.id, period)).sort((a, b) => (a.seq ?? 0) - (b.seq ?? 0));
@@ -131,7 +134,6 @@ export async function generateExport(company: Company, period: Period, onProgres
   onProgress?.("Compression…");
   const blob = await zip.generateAsync({ type: "blob", compression: "DEFLATE" });
   const zipName = `${slugify(company.name.replace(/\b(Sàrl|SA|Sarl|GmbH|AG)\b/gi, ""))}_${period.fileTag}.zip`;
-  downloadBlob(blob, zipName);
 
   // record export, lock expenses
   const ids = list.filter((e) => !e.exported_at).map((e) => e.id);
@@ -147,5 +149,12 @@ export async function generateExport(company: Company, period: Period, onProgres
     filename: zipName,
     expense_count: list.length,
   });
-  return { zipName, count: list.length, issues: issues.length };
+  return { blob, zipName, count: list.length, issues: issues.length };
+}
+
+/** Builds the ZIP and saves it to the device's downloads. */
+export async function generateExport(company: Company, period: Period, onProgress?: (msg: string) => void) {
+  const r = await generateExportBlob(company, period, onProgress);
+  downloadBlob(r.blob, r.zipName);
+  return { zipName: r.zipName, count: r.count, issues: r.issues };
 }
