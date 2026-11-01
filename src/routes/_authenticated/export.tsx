@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { FileArchive, Mail } from "lucide-react";
+import { FileText, Mail } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -13,7 +13,7 @@ import { downloadBlob } from "@/lib/files";
 import { MONTHS_FR, PERIOD_STATUS, formatDate } from "@/lib/format";
 
 export const Route = createFileRoute("/_authenticated/export")({
-  head: () => ({ meta: [{ title: "Export comptable — Mes Frais Pro" }, { name: "description", content: "Générer le ZIP pour le comptable." }, { property: "og:title", content: "Export comptable — Mes Frais Pro" }, { property: "og:description", content: "Excel + justificatifs." }] }),
+  head: () => ({ meta: [{ title: "Export comptable — Mes Frais Pro" }, { name: "description", content: "Générer le rapport PDF pour le comptable." }, { property: "og:title", content: "Export comptable — Mes Frais Pro" }, { property: "og:description", content: "Récapitulatif et justificatifs en un seul PDF." }] }),
   component: ExportPage,
 });
 
@@ -65,6 +65,7 @@ function ExportPage() {
     try {
       const r = await generateExportBlob(company!, period, setBusy);
       setShareable({ blob: r.blob, name: r.zipName });
+      downloadBlob(r.blob, r.zipName);
       toast.success(`${r.zipName} téléchargé (${r.count} dépenses${r.issues ? `, ${r.issues} point(s) de contrôle` : ""})`);
       qc.invalidateQueries({ queryKey: ["exports", company!.id] });
       qc.invalidateQueries({ queryKey: ["expenses"] });
@@ -75,9 +76,9 @@ function ExportPage() {
     }
   }
 
-  async function shareZip() {
+  async function shareReport() {
     if (!shareable) return;
-    const file = new File([shareable.blob], shareable.name, { type: "application/zip" });
+    const file = new File([shareable.blob], shareable.name, { type: "application/pdf" });
     if (!filesShareSupported(file)) {
       downloadBlob(shareable.blob, shareable.name);
       toast.info("Partage direct indisponible ici : le fichier a été retéléchargé, joignez-le depuis votre application e-mail.");
@@ -123,14 +124,14 @@ function ExportPage() {
           </div>
         )}
         <Button variant="accent" size="xl" className="w-full" disabled={!!busy} onClick={run}>
-          <FileArchive className="!size-5" /> {busy ?? "Générer le ZIP"}
+          <FileText className="!size-5" /> {busy ?? "Générer le rapport PDF"}
         </Button>
         {shareable && (
-          <Button variant="outline" size="xl" className="w-full" disabled={!!busy} onClick={shareZip}>
+          <Button variant="outline" size="xl" className="w-full" disabled={!!busy} onClick={shareReport}>
             <Mail className="!size-5" /> Envoyer par e-mail
           </Button>
         )}
-        <p className="text-xs text-muted-foreground">Contenu : tableau Excel, dossier Justificatifs (originaux renommés DEP-xxxx) et rapport de contrôle.</p>
+        <p className="text-xs text-muted-foreground">Un seul PDF : récapitulatif par catégorie (hors TVA, TVA, total), points de contrôle, puis tous les justificatifs.</p>
       </div>
 
       <section className="space-y-2">
