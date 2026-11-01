@@ -32,6 +32,7 @@ export async function generateExportBlob(company: Company, period: Period, onPro
   const zip = new JSZip();
   const folder = zip.folder("Justificatifs")!;
   const refsByExpense = new Map<string, string[]>();
+  const images: { name: string; data: Blob }[] = [];
   let i = 0;
   for (const e of list) {
     const names: string[] = [];
@@ -41,12 +42,23 @@ export async function generateExportBlob(company: Company, period: Period, onPro
       onProgress?.(`Justificatif ${i}…`);
       const { data, error } = await supabase.storage.from("receipts").download(r.path);
       if (error || !data) throw new Error(`Téléchargement impossible : ${r.filename}`);
-      const name = `${base}${e.receipts.length > 1 ? `_${k + 1}` : ""}.${extOf(r.filename, r.mime)}`;
-      folder.file(name, data);
+      const stem = `${base}${e.receipts.length > 1 ? `_${k + 1}` : ""}`;
+      const isImage = (r.mime || data.type || "").startsWith("image/");
+      // Les images sont allégées pour l'envoi par e-mail ; l'original reste intact dans l'archive.
+      const name = isImage ? `${stem}.jpg` : `${stem}.${extOf(r.filename, r.mime)}`;
+      if (isImage) images.push({ name, data });
+      else folder.file(name, data);
       names.push(name);
     }
     refsByExpense.set(e.id, names);
   }
+  const addImages = async (maxSide: number, quality: number) => {
+    for (const [n, im] of images.entries()) {
+      onProgress?.(`Allègement des photos ${n + 1}/${images.length}…`);
+      folder.file(im.name, await shrinkImage(im.data, maxSide, quality));
+    }
+  };
+  await addImages(1600, 0.7);
 
   onProgress?.("Création du fichier Excel…");
   const wb = new ExcelJS.Workbook();
@@ -80,7 +92,7 @@ export async function generateExportBlob(company: Company, period: Period, onPro
       ref: e.ref,
       date: formatDate(e.expense_date),
       supplier: e.supplier ?? "",
-      description: e.description ?? "",
+      description: shortDescription(e.categories?.name, e.description),
       category: e.categories?.name ?? "",
       ht: e.amount_ht != null ? Number(e.amount_ht) : null,
       vat: e.vat_lines.length ? Math.round(vatTotal * 100) / 100 : null,
@@ -132,7 +144,14 @@ export async function generateExportBlob(company: Company, period: Period, onPro
   zip.file("Rapport_de_controle.txt", report);
 
   onProgress?.("Compression…");
-  const blob = await zip.generateAsync({ type: "blob", compression: "DEFLATE" });
+  let blob = await zip.generateAsync({ type: "blob", compression: "DEFLATE" });
+  // Viser moins de 10 Mo pour l'envoi par e-mail : on réduit encore si besoin.
+  for (const [side, q] of [[1200, 0.55], [900, 0.45], [700, 0.4]] as const) {
+    if (blob.size <= 9.5 * 1024 * 1024 || !images.length) break;
+    await addImages(side, q);
+    onProgress?.("Compression…");
+    blob = await zip.generateAsync({ type: "blob", compression: "DEFLATE" });
+  }
   const zipName = `${slugify(company.name.replace(/\b(Sàrl|SA|Sarl|GmbH|AG)\b/gi, ""))}_${period.fileTag}.zip`;
 
   // record export, lock expenses
@@ -157,4 +176,47 @@ export async function generateExport(company: Company, period: Period, onProgres
   const r = await generateExportBlob(company, period, onProgress);
   downloadBlob(r.blob, r.zipName);
   return { zipName: r.zipName, count: r.count, issues: r.issues };
+}
+
+/** Libellé court par catégorie (ex. « Lunch », « Essence ») au lieu du détail du ticket. */
+const SHORT_LABELS: Record<string, string> = {
+  "Repas professionnels": "Lunch",
+  "Carburant": "Essence",
+  "Parking": "Parking",
+  "Transports et déplacements": "Transport",
+  "Hébergement et hôtels": "Hôtel",
+  "Marketing et publicité": "Publicité",
+  "Informatique et logiciels": "Informatique",
+  "Télécommunications": "Téléphone",
+  "Fournitures de bureau": "Fournitures",
+  "Matériel professionnel": "Matériel",
+  "Formation": "Formation",
+  "Frais de représentation": "Représentation",
+  "Frais bancaires": "Frais bancaires",
+  "Vêtements professionnels": "Vêtements",
+  "Entretien et réparations": "Entretien",
+};
+
+export function shortDescription(category: string | null | undefined, description: string | null | undefined): string {
+  if (category && SHORT_LABELS[category]) return SHORT_LABELS[category];
+  return category || description || "";
+}
+
+async function shrinkImage(data: Blob, maxSide: number, quality: number): Promise<Blob> {
+  try {
+    const bmp = await createImageBitmap(data);
+    const scale = Math.min(1, maxSide / Math.max(bmp.width, bmp.height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(bmp.width * scale);
+    canvas.height = Math.round(bmp.height * scale);
+    const ctx = canvas.getContext("2d")!;
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(bmp, 0, 0, canvas.width, canvas.height);
+    bmp.close();
+    const out = await new Promise<Blob | null>((res) => canvas.toBlob(res, "image/jpeg", quality));
+    return out && out.size < data.size ? out : data;
+  } catch {
+    return data;
+  }
 }
