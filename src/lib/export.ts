@@ -210,18 +210,31 @@ export function shortDescription(category: string | null | undefined, descriptio
   return category || description || "";
 }
 
-async function shrinkImage(data: Blob, maxSide: number, quality: number, forceJpeg = false): Promise<Blob> {
+async function loadImage(data: Blob): Promise<{ src: CanvasImageSource; w: number; h: number; done: () => void }> {
   try {
     const bmp = await createImageBitmap(data);
-    const scale = Math.min(1, maxSide / Math.max(bmp.width, bmp.height));
+    return { src: bmp, w: bmp.width, h: bmp.height, done: () => bmp.close() };
+  } catch {
+    // Safari / iPhone : repli via un élément image
+    const url = URL.createObjectURL(data);
+    const img = new Image();
+    await new Promise<void>((res, rej) => { img.onload = () => res(); img.onerror = () => rej(new Error("img")); img.src = url; });
+    return { src: img, w: img.naturalWidth, h: img.naturalHeight, done: () => URL.revokeObjectURL(url) };
+  }
+}
+
+async function shrinkImage(data: Blob, maxSide: number, quality: number, forceJpeg = false): Promise<Blob> {
+  try {
+    const im = await loadImage(data);
+    const scale = Math.min(1, maxSide / Math.max(im.w, im.h));
     const canvas = document.createElement("canvas");
-    canvas.width = Math.round(bmp.width * scale);
-    canvas.height = Math.round(bmp.height * scale);
+    canvas.width = Math.max(1, Math.round(im.w * scale));
+    canvas.height = Math.max(1, Math.round(im.h * scale));
     const ctx = canvas.getContext("2d")!;
     ctx.fillStyle = "#fff";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.drawImage(bmp, 0, 0, canvas.width, canvas.height);
-    bmp.close();
+    ctx.drawImage(im.src, 0, 0, canvas.width, canvas.height);
+    im.done();
     const out = await new Promise<Blob | null>((res) => canvas.toBlob(res, "image/jpeg", quality));
     return out && (forceJpeg || out.size < data.size) ? out : data;
   } catch {

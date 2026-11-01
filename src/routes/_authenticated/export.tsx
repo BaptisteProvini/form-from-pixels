@@ -65,8 +65,7 @@ function ExportPage() {
     try {
       const r = await generateExportBlob(company!, period, setBusy);
       setShareable({ blob: r.blob, name: r.zipName });
-      downloadBlob(r.blob, r.zipName);
-      toast.success(`${r.zipName} téléchargé (${r.count} dépenses${r.issues ? `, ${r.issues} point(s) de contrôle` : ""})`);
+      toast.success(`Rapport prêt (${r.count} dépenses${r.issues ? `, ${r.issues} point(s) de contrôle` : ""})`);
       qc.invalidateQueries({ queryKey: ["exports", company!.id] });
       qc.invalidateQueries({ queryKey: ["expenses"] });
     } catch (e) {
@@ -127,9 +126,15 @@ function ExportPage() {
           <FileText className="!size-5" /> {busy ?? "Générer le rapport PDF"}
         </Button>
         {shareable && (
-          <Button variant="outline" size="xl" className="w-full" disabled={!!busy} onClick={shareReport}>
-            <Mail className="!size-5" /> Envoyer par e-mail
-          </Button>
+          <div className="space-y-2 rounded-xl border border-accent/40 bg-secondary p-3">
+            <p className="text-sm font-medium">{shareable.name} · {(shareable.blob.size / 1024 / 1024).toFixed(1)} Mo</p>
+            <Button variant="accent" size="xl" className="w-full" disabled={!!busy} onClick={shareReport}>
+              <Mail className="!size-5" /> Envoyer par e-mail
+            </Button>
+            <Button variant="outline" size="xl" className="w-full" disabled={!!busy} onClick={() => downloadBlob(shareable.blob, shareable.name)}>
+              <FileText className="!size-5" /> Ouvrir / télécharger le PDF
+            </Button>
+          </div>
         )}
         <p className="text-xs text-muted-foreground">Un seul PDF : récapitulatif par catégorie (hors TVA, TVA, total), points de contrôle, puis tous les justificatifs.</p>
       </div>
