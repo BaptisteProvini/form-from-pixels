@@ -65,6 +65,7 @@ function ExportPage() {
     try {
       const r = await generateExportBlob(company!, period, setBusy);
       setShareable({ blob: r.blob, name: r.zipName });
+      downloadBlob(r.blob, r.zipName);
       toast.success(`${r.zipName} téléchargé (${r.count} dépenses${r.issues ? `, ${r.issues} point(s) de contrôle` : ""})`);
       qc.invalidateQueries({ queryKey: ["exports", company!.id] });
       qc.invalidateQueries({ queryKey: ["expenses"] });
