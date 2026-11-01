@@ -17,6 +17,15 @@ export const Route = createFileRoute("/_authenticated/export")({
   component: ExportPage,
 });
 
+function filesShareSupported(file: File): boolean {
+  const nav = navigator as Navigator & { canShare?: (d: ShareData) => boolean };
+  try {
+    return typeof nav.canShare === "function" && nav.canShare({ files: [file] } as ShareData);
+  } catch {
+    return false;
+  }
+}
+
 function ExportPage() {
   const { company } = useCompany();
   const qc = useQueryClient();
@@ -27,6 +36,7 @@ function ExportPage() {
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
+  const [shareable, setShareable] = useState<{ blob: Blob; name: string } | null>(null);
 
   const { data: exports = [] } = useQuery({
     queryKey: ["exports", company!.id],
@@ -53,7 +63,8 @@ function ExportPage() {
     const period = buildPeriod(kind, year, idx, { start, end });
     setBusy("Préparation…");
     try {
-      const r = await generateExport(company!, period, setBusy);
+      const r = await generateExportBlob(company!, period, setBusy);
+      setShareable({ blob: r.blob, name: r.zipName });
       toast.success(`${r.zipName} téléchargé (${r.count} dépenses${r.issues ? `, ${r.issues} point(s) de contrôle` : ""})`);
       qc.invalidateQueries({ queryKey: ["exports", company!.id] });
       qc.invalidateQueries({ queryKey: ["expenses"] });
@@ -61,6 +72,21 @@ function ExportPage() {
       toast.error(e instanceof Error ? e.message : "Export impossible");
     } finally {
       setBusy(null);
+    }
+  }
+
+  async function shareZip() {
+    if (!shareable) return;
+    const file = new File([shareable.blob], shareable.name, { type: "application/zip" });
+    if (!filesShareSupported(file)) {
+      downloadBlob(shareable.blob, shareable.name);
+      toast.info("Partage direct indisponible ici : le fichier a été retéléchargé, joignez-le depuis votre application e-mail.");
+      return;
+    }
+    try {
+      await navigator.share({ files: [file], title: shareable.name });
+    } catch (e) {
+      if (e instanceof Error && e.name !== "AbortError") toast.error("Partage impossible. Utilisez le fichier téléchargé.");
     }
   }
 
@@ -99,6 +125,11 @@ function ExportPage() {
         <Button variant="accent" size="xl" className="w-full" disabled={!!busy} onClick={run}>
           <FileArchive className="!size-5" /> {busy ?? "Générer le ZIP"}
         </Button>
+        {shareable && (
+          <Button variant="outline" size="xl" className="w-full" disabled={!!busy} onClick={shareZip}>
+            <Mail className="!size-5" /> Envoyer par e-mail
+          </Button>
+        )}
         <p className="text-xs text-muted-foreground">Contenu : tableau Excel, dossier Justificatifs (originaux renommés DEP-xxxx) et rapport de contrôle.</p>
       </div>
 
