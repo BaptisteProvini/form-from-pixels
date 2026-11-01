@@ -18,7 +18,10 @@ export function buildPeriod(kind: "mois" | "trimestre" | "annee" | "perso", year
   return { start: c.start, end: c.end, label: `${formatDate(c.start)} – ${formatDate(c.end)}`, fileTag: `${c.start}_${c.end}`, sheetTag: `${c.start}_${c.end}` };
 }
 
-export async function generateExport(company: Company, period: Period, onProgress?: (msg: string) => void) {
+export type ExportResult = { blob: Blob; zipName: string; count: number; issues: number };
+
+/** Builds the ZIP without downloading it (used for download and for native share). */
+export async function generateExportBlob(company: Company, period: Period, onProgress?: (msg: string) => void): Promise<ExportResult> {
   const [{ default: ExcelJS }, { default: JSZip }] = await Promise.all([import("exceljs"), import("jszip")]);
   onProgress?.("Lecture des dépenses…");
   const list = (await fetchExpenses(company.id, period)).sort((a, b) => (a.seq ?? 0) - (b.seq ?? 0));
