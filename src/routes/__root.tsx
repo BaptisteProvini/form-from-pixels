@@ -118,6 +118,29 @@ function RootComponent() {
     return () => data.subscription.unsubscribe();
   }, [router, queryClient]);
 
+  // Après une mise à jour, un ancien onglet peut réclamer des fichiers disparus
+  // ("Importing a module script failed") : on recharge une seule fois.
+  useEffect(() => {
+    const KEY = "mfp.chunkReload";
+    const reloadOnce = () => {
+      const last = Number(sessionStorage.getItem(KEY) || 0);
+      if (Date.now() - last < 10000) return;
+      sessionStorage.setItem(KEY, String(Date.now()));
+      window.location.reload();
+    };
+    const onPreload = (e: Event) => { e.preventDefault(); reloadOnce(); };
+    const onRejection = (e: PromiseRejectionEvent) => {
+      const msg = String(e.reason?.message ?? e.reason ?? "");
+      if (/Importing a module script failed|Failed to fetch dynamically imported module|error loading dynamically imported module/i.test(msg)) reloadOnce();
+    };
+    window.addEventListener("vite:preloadError", onPreload);
+    window.addEventListener("unhandledrejection", onRejection);
+    return () => {
+      window.removeEventListener("vite:preloadError", onPreload);
+      window.removeEventListener("unhandledrejection", onRejection);
+    };
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       <Outlet />
