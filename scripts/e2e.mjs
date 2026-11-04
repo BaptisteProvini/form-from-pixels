@@ -112,6 +112,7 @@ try {
     return { controller: !!navigator.serviceWorker.controller, active: reg?.active?.scriptURL ?? null, caches: counts };
   });
   log("service worker :", JSON.stringify(sw));
+  await page.evaluate(() => { location.hash = "#/accueil"; });
   await ctx.setOffline(true);
   await page.reload();
   await page.getByText("Scanner une dépense").first().waitFor({ timeout: 10000 });
