@@ -1,7 +1,5 @@
-import { Link, Outlet, useNavigate } from "@tanstack/react-router";
-import { Home, ListChecks, ScanLine, FileArchive, Settings, Building2, LogOut } from "lucide-react";
-import { useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { Link, Outlet } from "@tanstack/react-router";
+import { Home, ListChecks, ScanLine, FileArchive, Settings, Building2 } from "lucide-react";
 import { CompanyProvider, useCompany } from "./company-context";
 
 export function AppShell() {
@@ -41,18 +39,10 @@ const NAV = [
 
 function Shell() {
   const { company, isLoading } = useCompany();
-  const qc = useQueryClient();
-  const navigate = useNavigate();
-
-  async function signOut() {
-    await qc.cancelQueries();
-    qc.clear();
-    await supabase.auth.signOut();
-    navigate({ to: "/auth", replace: true });
-  }
 
   return (
     <div className="min-h-screen pb-24 md:pb-8">
+      <div className="h-[env(safe-area-inset-top)] bg-background" />
       <header className="sticky top-0 z-30 border-b bg-background/90 backdrop-blur">
         <div className="mx-auto flex max-w-5xl items-center gap-3 px-4 py-3">
           <Link to="/accueil" className="hidden shrink-0 font-display text-xl font-semibold text-primary sm:block">
@@ -71,9 +61,6 @@ function Shell() {
               </Link>
             ))}
           </nav>
-          <button onClick={signOut} aria-label="Se déconnecter" className="rounded-lg p-2 text-muted-foreground hover:bg-secondary">
-            <LogOut className="size-5" />
-          </button>
         </div>
       </header>
       <main className="mx-auto max-w-5xl px-4 py-5">

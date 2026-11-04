@@ -1,5 +1,5 @@
-import { supabase } from "@/integrations/supabase/client";
-import { duplicateMap, fetchExpenses, FIELD_LABELS, type Company } from "./data";
+import { duplicateMap, fetchExpenses, fetchUndated, FIELD_LABELS, type Company } from "./data";
+import { addExport, receiptBlob, setExportFlags } from "./db";
 import { MONTHS_FR, formatAmount, formatDate, slugify } from "./format";
 import { downloadBlob, extOf } from "./files";
 
@@ -25,7 +25,7 @@ export async function generateExportBlob(company: Company, period: Period, onPro
   const { PDFDocument, StandardFonts, rgb } = await import("pdf-lib");
   onProgress?.("Lecture des dépenses…");
   const all = await fetchExpenses(company.id, period);
-  const { data: undated } = await supabase.from("expenses").select("ref").eq("company_id", company.id).is("expense_date", null);
+  const undated = await fetchUndated(company.id);
   const dups = duplicateMap(all);
   const labelOf = (e: (typeof all)[number]) => shortDescription(e.categories?.name, e.description) || "Autres";
   // Tri par catégorie, puis par date
@@ -39,8 +39,12 @@ export async function generateExportBlob(company: Company, period: Period, onPro
     for (const [k, r] of e.receipts.entries()) {
       i++;
       onProgress?.(`Justificatif ${i}…`);
-      const { data, error } = await supabase.storage.from("receipts").download(r.path);
-      if (error || !data) throw new Error(`Téléchargement impossible : ${r.filename}`);
+      let data: Blob;
+      try {
+        data = await receiptBlob(r.path);
+      } catch {
+        throw new Error(`Justificatif introuvable sur cet appareil : ${r.filename}`);
+      }
       const mime = r.mime || data.type || "";
       files.push({ e, data, isPdf: mime.includes("pdf") || /\.pdf$/i.test(r.filename), part: e.receipts.length > 1 ? ` (${k + 1}/${e.receipts.length})` : "" });
     }
@@ -57,7 +61,7 @@ export async function generateExportBlob(company: Company, period: Period, onPro
     if (e.currency !== "CHF" && e.chf_amount == null) issues.push([e.ref!, "Contre-valeur CHF manquante", e.currency]);
     if (e.modified_after_export) issues.push([e.ref!, "Modifiée après un export précédent", ""]);
   }
-  for (const u of undated ?? []) issues.push([u.ref ?? "?", "Dépense sans date (non incluse dans la période)", ""]);
+  for (const u of undated) issues.push([u.ref ?? "?", "Dépense sans date (non incluse dans la période)", ""]);
 
   const vatOf = (e: (typeof list)[number]) => (e.vat_lines.length ? Math.round(e.vat_lines.reduce((s, l) => s + Number(l.amount ?? 0), 0) * 100) / 100 : null);
   const chfOf = (e: (typeof list)[number]) => (e.chf_amount != null ? Number(e.chf_amount) : e.currency === "CHF" && e.total_ttc != null ? Number(e.total_ttc) : 0);
@@ -165,10 +169,10 @@ export async function generateExportBlob(company: Company, period: Period, onPro
   // record export, lock expenses
   const ids = list.filter((e) => !e.exported_at).map((e) => e.id);
   const now = new Date().toISOString();
-  if (ids.length) await supabase.from("expenses").update({ exported_at: now }).in("id", ids);
+  if (ids.length) await setExportFlags(ids, { exported_at: now });
   const reexported = list.filter((e) => e.modified_after_export).map((e) => e.id);
-  if (reexported.length) await supabase.from("expenses").update({ modified_after_export: false, exported_at: now }).in("id", reexported);
-  await supabase.from("exports").insert({
+  if (reexported.length) await setExportFlags(reexported, { modified_after_export: false, exported_at: now });
+  await addExport({
     company_id: company.id,
     period_start: period.start,
     period_end: period.end,

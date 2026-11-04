@@ -10,7 +10,7 @@ import { formatAmount } from "@/lib/format";
 
 type Search = { statut?: string };
 
-export const Route = createFileRoute("/_authenticated/depenses/")({
+export const Route = createFileRoute("/_app/depenses/")({
   validateSearch: (s: Record<string, unknown>): Search => ({ statut: typeof s.statut === "string" ? s.statut : undefined }),
   head: () => ({ meta: [{ title: "Dépenses — Mes Frais Pro" }, { name: "description", content: "Liste et filtres des dépenses." }, { property: "og:title", content: "Dépenses — Mes Frais Pro" }, { property: "og:description", content: "Liste des dépenses." }] }),
   component: ListPage,

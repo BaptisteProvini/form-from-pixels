@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { FileText, Mail } from "lucide-react";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
+import { listExports, listPeriodStatus, setPeriodStatus } from "@/lib/db";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useCompany } from "@/components/company-context";
@@ -12,7 +12,7 @@ import { buildPeriod, generateExportBlob } from "@/lib/export";
 import { downloadBlob } from "@/lib/files";
 import { MONTHS_FR, PERIOD_STATUS, formatDate } from "@/lib/format";
 
-export const Route = createFileRoute("/_authenticated/export")({
+export const Route = createFileRoute("/_app/export")({
   head: () => ({ meta: [{ title: "Export comptable — Mes Frais Pro" }, { name: "description", content: "Générer le rapport PDF pour le comptable." }, { property: "og:title", content: "Export comptable — Mes Frais Pro" }, { property: "og:description", content: "Récapitulatif et justificatifs en un seul PDF." }] }),
   component: ExportPage,
 });
@@ -40,11 +40,11 @@ function ExportPage() {
 
   const { data: exports = [] } = useQuery({
     queryKey: ["exports", company!.id],
-    queryFn: async () => (await supabase.from("exports").select("*").eq("company_id", company!.id).order("created_at", { ascending: false })).data ?? [],
+    queryFn: () => listExports(company!.id),
   });
   const { data: statuses = [] } = useQuery({
     queryKey: ["period_status", company!.id],
-    queryFn: async () => (await supabase.from("period_status").select("*").eq("company_id", company!.id)).data ?? [],
+    queryFn: () => listPeriodStatus(company!.id),
   });
 
   const months = Array.from({ length: 6 }, (_, i) => {
@@ -53,8 +53,11 @@ function ExportPage() {
   });
 
   async function setStatus(month: string, status: string) {
-    const { error } = await supabase.from("period_status").upsert({ company_id: company!.id, month, status, updated_at: new Date().toISOString() });
-    if (error) return toast.error(error.message);
+    try {
+      await setPeriodStatus(company!.id, month, status);
+    } catch (e) {
+      return toast.error(e instanceof Error ? e.message : "Erreur");
+    }
     qc.invalidateQueries({ queryKey: ["period_status", company!.id] });
   }
 
@@ -79,12 +82,6 @@ function ExportPage() {
     if (!shareable) return;
     const file = new File([shareable.blob], shareable.name, { type: "application/pdf" });
     if (!filesShareSupported(file)) {
-      let embedded = false;
-      try { embedded = window.self !== window.top; } catch { embedded = true; }
-      if (embedded) {
-        toast.info("L'envoi par e-mail est bloqué dans l'aperçu Lovable. Ouvrez l'application dans Safari (lien publié ou lien d'aperçu) pour l'utiliser.", { duration: 10000 });
-        return;
-      }
       downloadBlob(shareable.blob, shareable.name);
       toast.info("Partage direct indisponible sur cet appareil : le fichier a été téléchargé, joignez-le depuis votre application e-mail.");
       return;

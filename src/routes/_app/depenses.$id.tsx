@@ -3,13 +3,14 @@ import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Download, Paperclip, Trash2, History, Lock } from "lucide-react";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
+import { deleteExpense, historyOf, receiptBlob, updateExpense } from "@/lib/db";
+import { downloadBlob } from "@/lib/files";
 import { Button } from "@/components/ui/button";
 import { ExpenseForm, emptyForm, formToRow, num, type FormState } from "@/components/expense-form";
 import { computeMissing, duplicateMap, fetchCategories, fetchExpense, fetchExpenses, uploadReceipts, FIELD_LABELS, type ExpenseFull } from "@/lib/data";
 import { formatDate } from "@/lib/format";
 
-export const Route = createFileRoute("/_authenticated/depenses/$id")({
+export const Route = createFileRoute("/_app/depenses/$id")({
   head: () => ({ meta: [{ title: "Dépense — Mes Frais Pro" }, { name: "description", content: "Détail d'une dépense." }, { property: "og:title", content: "Dépense — Mes Frais Pro" }, { property: "og:description", content: "Détail d'une dépense." }] }),
   component: DetailPage,
 });
@@ -41,7 +42,7 @@ function DetailPage() {
   const { data: cats = [] } = useQuery({ queryKey: ["categories", e?.company_id], queryFn: () => fetchCategories(e!.company_id), enabled: !!e });
   const { data: history = [] } = useQuery({
     queryKey: ["history", id],
-    queryFn: async () => (await supabase.from("expense_history").select("*").eq("expense_id", id).order("created_at", { ascending: false })).data ?? [],
+    queryFn: () => historyOf(id),
   });
   const { data: siblings = [] } = useQuery({ queryKey: ["expenses", e?.company_id], queryFn: () => fetchExpenses(e!.company_id), enabled: !!e });
   const dupList = duplicateMap(siblings).get(id) ?? [];
@@ -63,11 +64,8 @@ function DetailPage() {
     try {
       const row = formToRow(form!);
       const missing = computeMissing(row, e!.receipts.length);
-      const { error } = await supabase.from("expenses").update({ ...row, missing_fields: missing, status: form!.validated && missing.length === 0 ? "valide" : "a_valider" }).eq("id", id);
-      if (error) throw error;
-      await supabase.from("vat_lines").delete().eq("expense_id", id);
-      const vat = form!.vat_lines.map((l) => ({ expense_id: id, rate: num(l.rate), amount: num(l.amount) })).filter((l) => l.rate != null || l.amount != null);
-      if (vat.length) await supabase.from("vat_lines").insert(vat);
+      const vat = form!.vat_lines.map((l) => ({ rate: num(l.rate), amount: num(l.amount) })).filter((l) => l.rate != null || l.amount != null);
+      await updateExpense(id, { ...row, missing_fields: missing, status: form!.validated && missing.length === 0 ? "valide" : "a_valider" }, vat);
       toast.success("Modifications enregistrées");
       invalidate();
     } catch (err) {
@@ -78,18 +76,24 @@ function DetailPage() {
   }
 
   async function open(path: string, filename: string, download: boolean) {
-    const { data, error } = await supabase.storage.from("receipts").createSignedUrl(path, 300, download ? { download: filename } : undefined);
-    if (error) return toast.error(error.message);
-    window.open(data.signedUrl, "_blank");
+    try {
+      const blob = await receiptBlob(path);
+      if (download) return downloadBlob(blob, filename);
+      const url = URL.createObjectURL(blob);
+      const w = window.open(url, "_blank");
+      if (!w) downloadBlob(blob, filename);
+      setTimeout(() => URL.revokeObjectURL(url), 120_000);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Ouverture impossible");
+    }
   }
 
   async function addFiles(files: File[]) {
     if (!files.length) return;
-    const { data: u } = await supabase.auth.getUser();
     try {
-      await uploadReceipts({ userId: u.user!.id, companyId: e!.company_id, expenseId: id, files });
+      await uploadReceipts({ companyId: e!.company_id, expenseId: id, files });
       const missing = computeMissing(formToRow(form!), e!.receipts.length + files.length);
-      await supabase.from("expenses").update({ missing_fields: missing }).eq("id", id);
+      await updateExpense(id, { missing_fields: missing });
       toast.success("Justificatif ajouté");
       invalidate();
     } catch (err) {
@@ -98,9 +102,12 @@ function DetailPage() {
   }
 
   async function remove() {
-    if (!window.confirm(`Supprimer ${e!.ref} ? Le justificatif original reste archivé.`)) return;
-    const { error } = await supabase.from("expenses").delete().eq("id", id);
-    if (error) return toast.error(error.message);
+    if (!window.confirm(`Supprimer ${e!.ref} et ses justificatifs de cet appareil ?`)) return;
+    try {
+      await deleteExpense(id);
+    } catch (err) {
+      return toast.error(err instanceof Error ? err.message : "Suppression impossible");
+    }
     qc.invalidateQueries({ queryKey: ["expenses"] });
     navigate({ to: "/depenses" });
   }

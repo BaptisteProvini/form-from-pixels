@@ -1,18 +1,16 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useServerFn } from "@tanstack/react-start";
 import { Camera, Upload, RotateCcw, Sparkles, FileText, Paperclip, X, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { useCompany } from "@/components/company-context";
 import { ExpenseForm, emptyForm, formToRow, num, selectCls, type FormState } from "@/components/expense-form";
-import { analyzeReceipt } from "@/lib/analyze.functions";
-import { prepareForAnalysis } from "@/lib/files";
+import { analyzeLocally } from "@/lib/ocr";
+import { insertExpense } from "@/lib/db";
 import { checkDuplicates, computeMissing, fetchCategories, uploadReceipts } from "@/lib/data";
 
-export const Route = createFileRoute("/_authenticated/scanner")({
+export const Route = createFileRoute("/_app/scanner")({
   head: () => ({ meta: [{ title: "Scanner une dépense — Mes Frais Pro" }, { name: "description", content: "Photographiez un ticket." }, { property: "og:title", content: "Scanner — Mes Frais Pro" }, { property: "og:description", content: "Photographiez un ticket." }] }),
   component: ScannerPage,
 });
@@ -36,7 +34,7 @@ function ScannerPage() {
   const camRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const extraRef = useRef<HTMLInputElement>(null);
-  const analyze = useServerFn(analyzeReceipt);
+  const [progress, setProgress] = useState<string>("Lecture du justificatif…");
   const navigate = useNavigate();
   const qc = useQueryClient();
 
@@ -62,16 +60,9 @@ function ScannerPage() {
 
   async function runAnalysis() {
     setStep("analyzing");
+    setProgress("Lecture du justificatif…");
     try {
-      const prep = await prepareForAnalysis(files[0]);
-      const res = await analyze({ data: { dataBase64: prep.base64, mime: prep.mime, filename: files[0].name, categories: categories.map((c) => c.name) } });
-      if (!res.ok) {
-        toast.error(res.error);
-        setUncertain([]);
-        setStep("form");
-        return;
-      }
-      const r = res.result;
+      const r = await analyzeLocally(files[0], categories.map((c) => c.name), setProgress);
       const cat = r.category ? categories.find((c) => c.name.toLowerCase() === r.category!.toLowerCase()) : undefined;
       setAiCategory(r.category);
       setForm({
@@ -104,19 +95,9 @@ function ScannerPage() {
         if (!window.confirm(`Doublon possible :\n${msg}\n\nEnregistrer quand même ?`)) { setSaving(false); return; }
       }
       const missing = computeMissing(row, files.length);
-      const { data: u } = await supabase.auth.getUser();
-      const { data: exp, error } = await supabase
-        .from("expenses")
-        .insert({ ...row, company_id: companyId, missing_fields: missing, status: form.validated && missing.length === 0 ? "valide" : "a_valider" })
-        .select("id, ref")
-        .single();
-      if (error) throw error;
-      const vat = form.vat_lines.map((l) => ({ expense_id: exp.id, rate: num(l.rate), amount: num(l.amount) })).filter((l) => l.rate != null || l.amount != null);
-      if (vat.length) {
-        const { error: vErr } = await supabase.from("vat_lines").insert(vat);
-        if (vErr) throw vErr;
-      }
-      await uploadReceipts({ userId: u.user!.id, companyId, expenseId: exp.id, files });
+      const vat = form.vat_lines.map((l) => ({ rate: num(l.rate), amount: num(l.amount) })).filter((l) => l.rate != null || l.amount != null);
+      const exp = await insertExpense(companyId, { ...row, missing_fields: missing, status: form.validated && missing.length === 0 ? "valide" : "a_valider" }, vat);
+      await uploadReceipts({ companyId, expenseId: exp.id, files });
       qc.invalidateQueries({ queryKey: ["expenses"] });
       toast.success(`${exp.ref} enregistrée`);
       reset();
@@ -161,7 +142,8 @@ function ScannerPage() {
       {step === "analyzing" && (
         <div className="space-y-4">
           <Preview url={previewUrl} file={files[0]} scanning />
-          <p className="text-center font-medium text-primary">Lecture du justificatif…</p>
+          <p className="text-center font-medium text-primary">{progress}</p>
+          <p className="text-center text-xs text-muted-foreground">Lecture faite sur votre téléphone. La première fois, le module de lecture se télécharge (quelques secondes).</p>
         </div>
       )}
 

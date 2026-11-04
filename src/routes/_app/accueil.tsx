@@ -6,7 +6,7 @@ import { ExpenseRow } from "@/components/expense-row";
 import { chfValue, duplicateIds, fetchExpenses } from "@/lib/data";
 import { MONTHS_FR, formatAmount, monthRange } from "@/lib/format";
 
-export const Route = createFileRoute("/_authenticated/accueil")({
+export const Route = createFileRoute("/_app/accueil")({
   head: () => ({ meta: [{ title: "Accueil — Mes Frais Pro" }, { name: "description", content: "Vue d'ensemble de vos dépenses." }, { property: "og:title", content: "Accueil — Mes Frais Pro" }, { property: "og:description", content: "Vue d'ensemble de vos dépenses." }] }),
   component: Home,
 });
@@ -32,7 +32,7 @@ function Home() {
         </span>
         <span>
           <span className="block font-display text-2xl font-semibold">Scanner une dépense</span>
-          <span className="text-sm text-primary-foreground/75">Photo → IA → enregistré</span>
+          <span className="text-sm text-primary-foreground/75">Photo → lecture → enregistré</span>
         </span>
       </Link>
 

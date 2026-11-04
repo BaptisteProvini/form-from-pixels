@@ -1,26 +1,42 @@
-# Form From Pixels
+# Mes Frais Pro
 
-Implement exactly the screenshot and nothing else
+Application de tri des frais professionnels : on photographie un ticket, l'application lit la date,
+le montant, la TVA, le fournisseur et propose une catégorie, puis prépare le rapport PDF mensuel
+pour le comptable.
 
-This project was built with [Lovable](https://lovable.dev).
+**Entièrement autonome :** aucun compte, aucun serveur, aucun abonnement.
 
-**Live app**: https://form-from-pixels.lovable.app
+- Les dépenses et les justificatifs sont enregistrés **sur le téléphone** (IndexedDB).
+- La lecture des tickets se fait **sur le téléphone** (Tesseract, fichiers hébergés avec l'app ;
+  texte extrait directement pour les PDF numériques).
+- L'application est un site statique publié gratuitement sur **GitHub Pages** et fonctionne hors connexion.
+- **Sauvegarde / restauration** en un fichier ZIP depuis l'écran Réglages.
 
-## Build with Lovable
+## Utiliser sur iPhone
 
-Continue developing this project in the [Lovable editor](https://lovable.dev/projects/d273b8b2-8693-4240-be75-d1c022f5a962).
+1. Ouvrir le lien GitHub Pages dans **Safari**.
+2. Partager → **« Sur l'écran d'accueil »**.
+3. Lancer l'app depuis l'icône (les données y sont conservées durablement).
+4. Faire une sauvegarde régulièrement (Réglages → Sauvegarder mes données).
 
-- **Ship faster**: describe what you want to build and Lovable handles the code.
-- **Stay in sync**: every change made in Lovable is committed straight to this repository.
-- **Full ownership**: this code is yours. Push to `main` on GitHub and your changes sync back into Lovable, ready for your next prompt.
+## Développement
 
-## Development
-
-Prefer working locally? You need Node.js and npm — [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating).
+Node.js 22 :
 
 ```sh
-git clone <this-repository-url>
-cd <repository-name>
-npm i
-npm run dev
+npm install --legacy-peer-deps
+npm run dev      # http://localhost:5173
+npm test
+npm run build    # dossier dist/
 ```
+
+Chaque `git push` sur `main` compile, teste et publie l'application (`.github/workflows/publier.yml`).
+
+## Organisation du code
+
+- `src/lib/db.ts` — stockage local (sociétés, catégories, dépenses, TVA, justificatifs, historique, exports, sauvegarde).
+- `src/lib/data.ts` — requêtes utilisées par les écrans, doublons, champs manquants.
+- `src/lib/ocr.ts` — lecture d'une photo ou d'un PDF sur l'appareil.
+- `src/lib/receipt-parser.ts` — extraction date / montant / TVA / fournisseur / catégorie à partir du texte.
+- `src/lib/export.ts` — rapport PDF pour le comptable.
+- `src/routes/_app/*` — écrans Accueil, Dépenses, Scanner, Export, Réglages.
