@@ -99,7 +99,8 @@ export function db(): Promise<IDBPDatabase<FraisDB>> {
     }).then(async (d) => {
       // Premier lancement : mêmes sociétés et catégories que l'application d'origine.
       if ((await d.count("companies")) === 0 && ls.get("mfp.seeded") !== "1") {
-        for (const name of DEFAULT_COMPANIES) await insertCompany(d, name);
+        const t0 = Date.now();
+        for (const [i, name] of DEFAULT_COMPANIES.entries()) await insertCompany(d, name, new Date(t0 + i).toISOString());
         ls.set("mfp.seeded", "1");
       }
       return d;
@@ -108,8 +109,8 @@ export function db(): Promise<IDBPDatabase<FraisDB>> {
   return dbPromise;
 }
 
-async function insertCompany(d: IDBPDatabase<FraisDB>, name: string): Promise<Company> {
-  const c: Company = { id: uid(), name, next_seq: 1, created_at: now() };
+async function insertCompany(d: IDBPDatabase<FraisDB>, name: string, createdAt = now()): Promise<Company> {
+  const c: Company = { id: uid(), name, next_seq: 1, created_at: createdAt };
   const tx = d.transaction(["companies", "categories"], "readwrite");
   await tx.objectStore("companies").put(c);
   for (const n of DEFAULT_CATEGORIES) {
