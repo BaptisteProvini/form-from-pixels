@@ -105,6 +105,13 @@ try {
 
   // 9. Hors connexion (service worker)
   await page.waitForTimeout(1500);
+  const sw = await page.evaluate(async () => {
+    const reg = await navigator.serviceWorker.getRegistration();
+    const keys = await caches.keys();
+    const counts = await Promise.all(keys.map(async (k) => `${k}=${(await (await caches.open(k)).keys()).length}`));
+    return { controller: !!navigator.serviceWorker.controller, active: reg?.active?.scriptURL ?? null, caches: counts };
+  });
+  log("service worker :", JSON.stringify(sw));
   await ctx.setOffline(true);
   await page.reload();
   await page.getByText("Scanner une dépense").first().waitFor({ timeout: 10000 });
@@ -114,6 +121,8 @@ try {
   fail(e instanceof Error ? e.message : String(e));
   await page.screenshot({ path: "e2e-failure.png", fullPage: true }).catch(() => {});
   log("texte de la page :", (await page.locator("body").innerText().catch(() => "")).slice(0, 1500));
+  log("url :", page.url());
+  log("toutes les erreurs :\n  " + errors.slice(-15).join("\n  "));
 }
 
 const realErrors = errors.filter((e) => !/net::ERR_INTERNET_DISCONNECTED|ERR_INTERNET_DISCONNECTED/.test(e));
