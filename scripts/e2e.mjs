@@ -62,7 +62,7 @@ try {
     log("catégorie non devinée → choisie à la main");
     await catSelect.selectOption({ label: "Repas professionnels" });
   } else log("catégorie devinée :", await catSelect.locator("option:checked").textContent());
-  const supplier = page.locator("input:not([type])").first();
+  const supplier = page.locator("main input:not([type]):not([inputmode])").first();
   log("fournisseur lu :", await supplier.inputValue());
   if (!(await supplier.inputValue())) await supplier.fill("Restaurant Le Lac");
 
@@ -86,8 +86,9 @@ try {
 
   // 7. Export PDF du mois d'octobre 2026
   await page.goto(`${BASE}#/export`);
-  await page.locator("select").nth(0).selectOption({ index: 9 });
-  await page.locator("select").nth(1).selectOption("2026");
+  await page.getByRole("button", { name: /Générer le rapport PDF/ }).waitFor();
+  await page.locator("main select").nth(0).selectOption({ index: 9 });
+  await page.locator("main select").nth(1).selectOption("2026");
   await page.getByRole("button", { name: /Générer le rapport PDF/ }).click();
   await page.getByText(/Rapport prêt/).waitFor({ timeout: 60000 });
   const dl = page.waitForEvent("download");
