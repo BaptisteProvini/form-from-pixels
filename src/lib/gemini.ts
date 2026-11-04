@@ -50,7 +50,7 @@ async function apiError(res: Response): Promise<GeminiError> {
 export async function testGeminiKey(key: string): Promise<void> {
   let res: Response;
   try {
-    res = await fetch(`${API}/models?pageSize=1&key=${encodeURIComponent(key.trim())}`);
+    res = await fetch(`${API}/models?pageSize=1`, { headers: { "x-goog-api-key": key.trim() } });
   } catch {
     throw new GeminiError("Pas de connexion internet.", "network");
   }
@@ -172,9 +172,9 @@ export async function analyzeWithGemini(file: File, categories: string[], key: s
   for (const model of MODELS) {
     let res: Response;
     try {
-      res = await fetch(`${API}/models/${model}:generateContent?key=${encodeURIComponent(key)}`, {
+      res = await fetch(`${API}/models/${model}:generateContent`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "x-goog-api-key": key },
         body,
       });
     } catch {

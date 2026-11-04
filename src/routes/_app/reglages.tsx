@@ -268,7 +268,7 @@ function GeminiSection() {
         ) : (
           <>
             <div className="flex gap-2">
-              <Input type="password" autoComplete="off" placeholder="Coller la clé (AIza…)" value={value} onChange={(e) => setValue(e.target.value)} onKeyDown={(e) => e.key === "Enter" && save()} />
+              <Input type="password" autoComplete="off" placeholder="Coller la clé Gemini" value={value} onChange={(e) => setValue(e.target.value)} onKeyDown={(e) => e.key === "Enter" && save()} />
               <Button variant="accent" disabled={busy || !value.trim()} onClick={save}>{busy ? "…" : "Enregistrer"}</Button>
             </div>
             <a href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-sm font-medium text-primary underline-offset-2 hover:underline">
