@@ -1,7 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Pencil, Plus, Trash2, Check, Download, Upload, ShieldCheck, Smartphone } from "lucide-react";
+import { Pencil, Plus, Trash2, Check, Download, Upload, ShieldCheck, Smartphone, Sparkles, ExternalLink } from "lucide-react";
+import { getGeminiKey, setGeminiKey, testGeminiKey } from "@/lib/gemini";
 import { toast } from "sonner";
 import { countExpenses, createCategory, createCompany, deleteCategory, deleteCompany, exportBackup, importBackup, renameCompany } from "@/lib/db";
 import { downloadBlob } from "@/lib/files";
@@ -106,6 +107,8 @@ function Settings() {
         </section>
       )}
 
+      <GeminiSection />
+
       <BackupSection onRestored={() => qc.invalidateQueries()} />
 
       <section className="rounded-2xl border bg-secondary/50 p-4 text-xs leading-relaxed text-muted-foreground">
@@ -199,6 +202,84 @@ function BackupSection({ onRestored }: { onRestored: () => void }) {
       {persisted && (
         <p className="flex items-center gap-1 text-xs text-muted-foreground"><ShieldCheck className="size-3.5" /> Stockage protégé contre l'effacement automatique.</p>
       )}
+    </section>
+  );
+}
+
+function GeminiSection() {
+  const [saved, setSaved] = useState<string | null>(null);
+  const [value, setValue] = useState("");
+  const [busy, setBusy] = useState(false);
+  useEffect(() => setSaved(getGeminiKey()), []);
+
+  async function save() {
+    const k = value.trim();
+    if (!k) return;
+    setBusy(true);
+    try {
+      await testGeminiKey(k);
+      setGeminiKey(k);
+      setSaved(k);
+      setValue("");
+      toast.success("Clé Gemini enregistrée : les tickets seront lus par Gemini.");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Clé refusée");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function check() {
+    if (!saved) return;
+    setBusy(true);
+    try {
+      await testGeminiKey(saved);
+      toast.success("La clé fonctionne.");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Clé refusée");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function remove() {
+    if (!window.confirm("Retirer la clé Gemini ? Les tickets seront lus sur le téléphone.")) return;
+    setGeminiKey(null);
+    setSaved(null);
+  }
+
+  return (
+    <section className="space-y-3">
+      <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Lecture des tickets</h2>
+      <div className="space-y-3 rounded-2xl border bg-card p-4 shadow-card">
+        <div className="flex items-start gap-2">
+          <Sparkles className="mt-0.5 size-4 shrink-0 text-accent" />
+          <p className="text-sm">
+            {saved
+              ? <>Lecture par <strong>Gemini</strong> activée (clé …{saved.slice(-4)}). Sans connexion, l'app lit les tickets sur le téléphone.</>
+              : <>Ajoutez une clé <strong>Google Gemini</strong> gratuite pour une lecture bien plus fiable. Sans clé, les tickets sont lus sur le téléphone.</>}
+          </p>
+        </div>
+        {saved ? (
+          <div className="flex gap-2">
+            <Button variant="outline" className="flex-1" disabled={busy} onClick={check}>Tester la clé</Button>
+            <Button variant="outline" className="flex-1" disabled={busy} onClick={remove}><Trash2 /> Retirer</Button>
+          </div>
+        ) : (
+          <>
+            <div className="flex gap-2">
+              <Input type="password" autoComplete="off" placeholder="Coller la clé (AIza…)" value={value} onChange={(e) => setValue(e.target.value)} onKeyDown={(e) => e.key === "Enter" && save()} />
+              <Button variant="accent" disabled={busy || !value.trim()} onClick={save}>{busy ? "…" : "Enregistrer"}</Button>
+            </div>
+            <a href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-sm font-medium text-primary underline-offset-2 hover:underline">
+              Obtenir une clé gratuite sur Google AI Studio <ExternalLink className="size-3.5" />
+            </a>
+          </>
+        )}
+        <p className="text-xs text-muted-foreground">
+          La clé reste sur ce téléphone. Seule la photo du ticket est envoyée à Google pour la lecture ; vos dépenses ne quittent pas l'appareil. Avec l'offre gratuite, Google peut utiliser les images envoyées pour améliorer ses services.
+        </p>
+      </div>
     </section>
   );
 }

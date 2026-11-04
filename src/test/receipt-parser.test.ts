@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { amountsIn, findDate, parseReceiptText } from "@/lib/receipt-parser";
 import { DEFAULT_CATEGORIES } from "@/lib/db";
+import { sanitize } from "@/lib/gemini";
 
 const today = new Date(2026, 10, 4);
 const parse = (t: string, fromOcr = true) => parseReceiptText(t, DEFAULT_CATEGORIES, { fromOcr, today });
@@ -96,5 +97,21 @@ CHF 7.50`);
     expect(findDate("Le 31.12.2031", today)).toBeNull();
     expect(findDate("Le 31.02.2026", today)).toBeNull();
     expect(findDate("2026-10-01", today)).toBe("2026-10-01");
+  });
+});
+
+describe("réponse Gemini", () => {
+  it("nettoie et contrôle les valeurs", () => {
+    const r = sanitize(
+      { expense_date: "16.09.2026", supplier: " Fleur de Pains ", total_ttc: "15,40", currency: "chf", vat_lines: [{ rate: 2.6, amount: 0.39 }, { rate: 0, amount: null }], category: "Restaurant", uncertain_fields: [], readable: true },
+      DEFAULT_CATEGORIES,
+    );
+    expect(r.expense_date).toBeNull();
+    expect(r.supplier).toBe("Fleur de Pains");
+    expect(r.total_ttc).toBe(15.4);
+    expect(r.currency).toBe("CHF");
+    expect(r.vat_lines).toEqual([{ rate: 2.6, amount: 0.39 }]);
+    expect(r.category).toBeNull();
+    expect(r.uncertain_fields).toEqual(expect.arrayContaining(["expense_date", "category"]));
   });
 });

@@ -103,6 +103,31 @@ try {
   const zip = await bk;
   log("sauvegarde :", zip.suggestedFilename());
 
+  // 8b. Lecture par Gemini (réponse de Google simulée)
+  let geminiBody = "";
+  await page.route("https://generativelanguage.googleapis.com/**", (route) => {
+    const req = route.request();
+    if (req.method() === "GET") return route.fulfill({ json: { models: [] } });
+    geminiBody = req.postData() ?? "";
+    const answer = { expense_date: "2026-09-16", supplier: "Fleur de Pains", description: "Sandwichs", total_ttc: 15.4, currency: "CHF", amount_ht: 15.01, vat_lines: [{ rate: 2.6, amount: 0.39 }], category: "Repas professionnels", uncertain_fields: [], readable: true, notes: null };
+    return route.fulfill({ json: { candidates: [{ content: { parts: [{ text: JSON.stringify(answer) }] } }] } });
+  });
+  await page.getByPlaceholder("Coller la clé (AIza…)").fill("AIzaTEST1234");
+  await page.getByRole("button", { name: "Enregistrer", exact: true }).click();
+  await page.getByText(/clé …1234/).waitFor({ timeout: 10000 });
+  await page.goto(`${BASE}#/scanner`);
+  await page.locator('input[type=file][accept="image/*,application/pdf"]:not([multiple])').setInputFiles({ name: "ticket2.png", mimeType: "image/png", buffer: Buffer.from(png, "base64") });
+  await page.getByRole("button", { name: /Analyser/ }).click();
+  await page.getByText("Vérifier la dépense").waitFor({ timeout: 30000 });
+  const gSupplier = await page.locator("main input:not([type]):not([inputmode])").first().inputValue();
+  const gTotal = await page.locator("main input[inputmode=decimal]").first().inputValue();
+  const gDate = await page.locator("main input[type=date]").first().inputValue();
+  log("Gemini :", gSupplier, gTotal, gDate);
+  if (gSupplier !== "Fleur de Pains" || gTotal !== "15.4" || gDate !== "2026-09-16") fail("les champs lus par Gemini ne sont pas repris dans le formulaire");
+  if (!geminiBody.includes("inline_data") || !geminiBody.includes("Repas professionnels")) fail("requête Gemini incomplète");
+  await page.unroute("https://generativelanguage.googleapis.com/**");
+  external.delete("generativelanguage.googleapis.com");
+
   // 9. Hors connexion (service worker)
   await page.waitForTimeout(1500);
   const sw = await page.evaluate(async () => {

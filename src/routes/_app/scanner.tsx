@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { useCompany } from "@/components/company-context";
 import { ExpenseForm, emptyForm, formToRow, num, selectCls, type FormState } from "@/components/expense-form";
 import { analyzeLocally } from "@/lib/ocr";
+import { analyzeWithGemini, getGeminiKey } from "@/lib/gemini";
 import { insertExpense } from "@/lib/db";
 import { checkDuplicates, computeMissing, fetchCategories, uploadReceipts } from "@/lib/data";
 
@@ -62,7 +63,18 @@ function ScannerPage() {
     setStep("analyzing");
     setProgress("Lecture du justificatif…");
     try {
-      const r = await analyzeLocally(files[0], categories.map((c) => c.name), setProgress);
+      const names = categories.map((c) => c.name);
+      const key = getGeminiKey();
+      let r = null as Awaited<ReturnType<typeof analyzeLocally>> | null;
+      if (key) {
+        setProgress("Lecture par Gemini…");
+        try {
+          r = await analyzeWithGemini(files[0], names, key);
+        } catch (e) {
+          toast.warning(`${e instanceof Error ? e.message : "Gemini indisponible."} Lecture sur le téléphone à la place.`);
+        }
+      }
+      if (!r) r = await analyzeLocally(files[0], names, setProgress);
       const cat = r.category ? categories.find((c) => c.name.toLowerCase() === r.category!.toLowerCase()) : undefined;
       setAiCategory(r.category);
       setForm({
@@ -143,7 +155,7 @@ function ScannerPage() {
         <div className="space-y-4">
           <Preview url={previewUrl} file={files[0]} scanning />
           <p className="text-center font-medium text-primary">{progress}</p>
-          <p className="text-center text-xs text-muted-foreground">Lecture faite sur votre téléphone. La première fois, le module de lecture se télécharge (quelques secondes).</p>
+          <p className="text-center text-xs text-muted-foreground">{getGeminiKey() ? "Lecture par Gemini avec votre clé personnelle." : "Lecture faite sur votre téléphone. Pour une lecture bien plus fiable, ajoutez une clé Gemini gratuite dans Réglages."}</p>
         </div>
       )}
 
