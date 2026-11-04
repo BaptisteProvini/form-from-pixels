@@ -33,6 +33,16 @@ jobs:
         continue-on-error: true
       - name: Tests
         run: npm test
+      - name: Test dans un navigateur
+        run: |
+          npm install --no-save --no-audit --no-fund --legacy-peer-deps playwright@1.55.0
+          npx playwright install --with-deps chromium
+          (npx vite preview --port 4173 --strictPort > preview.log 2>&1 &)
+          sleep 4
+          node scripts/e2e.mjs
+        env:
+          BASE_PATH: /${{ github.event.repository.name }}/
+          E2E_URL: http://localhost:4173/${{ github.event.repository.name }}/
       - name: Préparer la publication
         run: cp dist/index.html dist/404.html && touch dist/.nojekyll
       - uses: actions/upload-pages-artifact@v3
